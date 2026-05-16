@@ -1,0 +1,166 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <title>PexRTC minimal join</title>
+  <style>
+    body { font-family: system-ui, sans-serif; margin: 1rem; max-width: 720px; }
+    fieldset { border: 1px solid #ccc; padding: 1rem; margin-bottom: 1rem; }
+    label { display: block; margin: 0.25rem 0; }
+    input, button { font: inherit; padding: 0.4rem; }
+    .videos { display: grid; grid-template-columns: 1fr 1fr; gap: 0.5rem; }
+    video { width: 100%; background: #111; border-radius: 4px; }
+    .row { display: flex; gap: 0.5rem; align-items: center; margin-top: 0.5rem; }
+    #status { font-family: ui-monospace, monospace; font-size: 0.85rem; }
+  </style>
+</head>
+<body>
+  <h1>Pexip PexRTC — minimal join</h1>
+
+  <fieldset id="join-form">
+    <legend>Join a conference</legend>
+    <label>Conferencing Node:
+      <input id="node" placeholder="conf.example.com" size="40">
+    </label>
+    <label>Conference alias:
+      <input id="alias" placeholder="meet.alice" size="40">
+    </label>
+    <label>Display name:
+      <input id="name" placeholder="Your name" size="40">
+    </label>
+    <div class="row">
+      <button id="join-btn">Join</button>
+      <button id="hangup-btn" disabled>Hang up</button>
+      <button id="mute-audio-btn" disabled>Mute audio</button>
+      <button id="mute-video-btn" disabled>Mute video</button>
+    </div>
+  </fieldset>
+
+  <div class="videos">
+    <video id="local" autoplay muted playsinline></video>
+    <video id="remote" autoplay playsinline></video>
+  </div>
+
+  <p id="status">Idle.</p>
+
+  <!-- The src is rewritten on Join to point at the chosen Conferencing Node.
+       In production, hardcode the URL to your CN. -->
+  <script>
+    const $ = (id) => document.getElementById(id);
+    const setStatus = (msg) => { $("status").textContent = msg; };
+
+    let rtc = null;
+    let audioMuted = false;
+    let videoMuted = false;
+
+    async function loadPexRTC(node) {
+      // Load pexrtc.js from the chosen Conferencing Node. Avoid loading twice
+      // (re-defining window.PexRTC mid-call breaks state).
+      if (window.PexRTC) return;
+      await new Promise((resolve, reject) => {
+        const s = document.createElement("script");
+        s.src = `https://${node}/static/webrtc/js/pexrtc.js`;
+        s.onload = resolve;
+        s.onerror = () => reject(new Error(`Failed to load pexrtc.js from ${node}`));
+        document.head.appendChild(s);
+      });
+    }
+
+    async function join() {
+      const node  = $("node").value.trim();
+      const alias = $("alias").value.trim();
+      const name  = $("name").value.trim() || "Anonymous";
+      if (!node || !alias) { setStatus("Need node and alias."); return; }
+
+      try {
+        await loadPexRTC(node);
+      } catch (e) {
+        setStatus(e.message);
+        return;
+      }
+
+      rtc = new PexRTC();
+
+      rtc.onSetup = (stream, pin_status, conference_extension, idp_selection) => {
+        $("local").srcObject = stream;
+        if (idp_selection && idp_selection.length) {
+          // Picking IDPs is out of scope for this minimal example — first one wins.
+          setStatus(`SSO required: choosing ${idp_selection[0].name}`);
+          rtc.connect(null, undefined, idp_selection[0].uuid);
+          return;
+        }
+        if (conference_extension) {
+          // Virtual Reception — out of scope here.
+          setStatus("This alias is a Virtual Reception. Update the demo to handle extension dispatch.");
+          return;
+        }
+        let pin = null;
+        if (pin_status === "required") {
+          pin = prompt("Conference PIN:");
+          if (!pin) { setStatus("Cancelled."); return; }
+        } else if (pin_status === "optional") {
+          // Guests joining a host-PIN room must literally send "none".
+          pin = "none";
+        }
+        setStatus("Connecting…");
+        rtc.connect(pin);
+      };
+
+      rtc.onConnect = (stream) => {
+        $("remote").srcObject = stream;
+        $("hangup-btn").disabled = false;
+        $("mute-audio-btn").disabled = false;
+        $("mute-video-btn").disabled = false;
+        $("join-btn").disabled = true;
+        setStatus(`Connected to ${alias} on ${node}.`);
+      };
+
+      rtc.onError = (err) => {
+        setStatus(`Error: ${err}`);
+        cleanup();
+      };
+
+      rtc.onDisconnect = (reason) => {
+        setStatus(`Disconnected: ${reason}`);
+        cleanup();
+      };
+
+      setStatus("Setting up…");
+      rtc.makeCall(node, alias, name, 1280);
+    }
+
+    function hangup() {
+      if (rtc) rtc.disconnect();
+      cleanup();
+      setStatus("Hung up.");
+    }
+
+    function cleanup() {
+      $("hangup-btn").disabled = true;
+      $("mute-audio-btn").disabled = true;
+      $("mute-video-btn").disabled = true;
+      $("join-btn").disabled = false;
+      $("local").srcObject = null;
+      $("remote").srcObject = null;
+      audioMuted = false;
+      videoMuted = false;
+      $("mute-audio-btn").textContent = "Mute audio";
+      $("mute-video-btn").textContent = "Mute video";
+      rtc = null;
+    }
+
+    $("join-btn").addEventListener("click", join);
+    $("hangup-btn").addEventListener("click", hangup);
+    $("mute-audio-btn").addEventListener("click", () => {
+      audioMuted = !audioMuted;
+      rtc.muteAudio(audioMuted);
+      $("mute-audio-btn").textContent = audioMuted ? "Unmute audio" : "Mute audio";
+    });
+    $("mute-video-btn").addEventListener("click", () => {
+      videoMuted = !videoMuted;
+      rtc.muteVideo(videoMuted);
+      $("mute-video-btn").textContent = videoMuted ? "Unmute video" : "Mute video";
+    });
+  </script>
+</body>
+</html>
