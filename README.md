@@ -48,6 +48,21 @@ This copies every skill in `skills/` to `~/.claude/skills/`, making them availab
 ./scripts/install-one.sh pexip-external-policy
 ```
 
+### Windows (PowerShell)
+
+The `.sh` scripts above are Bash and need **Git Bash** or **WSL**. In native PowerShell or `cmd.exe`, use the PowerShell installer instead:
+
+```powershell
+git clone https://github.com/lorist/pexip-claude-skills.git
+cd pexip-claude-skills
+.\scripts\install.ps1                              # all skills → %USERPROFILE%\.claude\skills
+.\scripts\install.ps1 -Skill pexip-external-policy # just one
+.\scripts\install.ps1 -Symlink                     # symlink (needs Developer Mode or admin)
+.\scripts\install.ps1 -Dest C:\custom\skills       # custom destination
+```
+
+If PowerShell blocks the script with an execution-policy error, run it for the current process only: `powershell -ExecutionPolicy Bypass -File .\scripts\install.ps1`.
+
 ### Install for Claude.ai (web/desktop)
 
 Build packaged `.skill` files and upload them via the Claude.ai settings:
