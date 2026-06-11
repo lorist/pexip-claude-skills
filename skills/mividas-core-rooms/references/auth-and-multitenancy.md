@@ -8,7 +8,7 @@ Every Mividas installation has its own hostname. The API lives under `/json-api/
 https://<mividas-host>/json-api/v1/
 ```
 
-The host might look like `mividas.example.com`, `mividas.customer.pextest.com`, or any other FQDN — there is no shared `mividas.com` API. The hostname comes from the customer's deployment.
+The host might look like `mividas.example.com`, `video-mgmt.customer.example.org`, or any other FQDN — there is no shared `mividas.com` API. The hostname comes from the customer's deployment.
 
 ## Authentication
 

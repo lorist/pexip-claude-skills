@@ -33033,4 +33033,4 @@ components:
           scopes:
             read:groups: read groups
 servers:
-- url: https://mividas.anzsec.pextest.com/json-api/v1
+- url: https://mividas.example.com/json-api/v1
