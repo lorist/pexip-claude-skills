@@ -26,7 +26,7 @@ node_modules/
 
 # Local install symlinks / scratch
 .claude-local/
-
+.claude
 # Per-user Claude Code settings (machine-specific permission allowlists, etc).
 # .claude/settings.json is intentionally NOT ignored — it's the shared/committed
 # project settings file when one exists.
