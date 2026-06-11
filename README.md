@@ -1,5 +1,7 @@
 # Pexip Claude Skills
 
+[![Validate](https://github.com/lorist/pexip-claude-skills/actions/workflows/validate.yml/badge.svg)](https://github.com/lorist/pexip-claude-skills/actions/workflows/validate.yml)
+
 A collection of [Claude Agent Skills](https://docs.claude.com/en/docs/agents-and-tools/agent-skills/overview) for working with [Pexip Infinity](https://www.pexip.com/) and the wider Pexip platform. Each skill captures hard-won, field-tested knowledge that makes Claude meaningfully better at a specific Pexip task — without you having to re-explain context every conversation.
 
 ## What's in here

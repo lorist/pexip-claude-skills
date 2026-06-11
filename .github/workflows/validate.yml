@@ -1,0 +1,66 @@
+name: Validate
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+
+permissions:
+  contents: read
+
+jobs:
+  skills:
+    name: Skill structure
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Validate every skill (SKILL.md, frontmatter, references)
+        run: ./scripts/validate.sh
+
+  scripts:
+    name: Script syntax
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Syntax-check shell scripts
+        run: |
+          shopt -s nullglob
+          for f in scripts/*.sh skills/*/scripts/*.sh; do
+            echo "bash -n $f"
+            bash -n "$f"
+          done
+
+      - name: Compile-check Python scripts
+        run: |
+          shopt -s nullglob globstar
+          for f in skills/*/scripts/**/*.py; do
+            echo "py_compile $f"
+            python3 -m py_compile "$f"
+          done
+
+      - name: Syntax-check PowerShell scripts
+        shell: pwsh
+        run: |
+          $failed = $false
+          Get-ChildItem -Path scripts -Filter *.ps1 | ForEach-Object {
+            Write-Host "parse $($_.FullName)"
+            $errors = $null
+            [System.Management.Automation.Language.Parser]::ParseFile($_.FullName, [ref]$null, [ref]$errors) | Out-Null
+            if ($errors) { $errors | ForEach-Object { Write-Error $_.Message }; $failed = $true }
+          }
+          if ($failed) { exit 1 }
+
+  secrets:
+    name: Secret scan
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0  # gitleaks scans full history on push, the PR range on PRs
+
+      - name: Gitleaks
+        uses: gitleaks/gitleaks-action@v2
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
