@@ -149,7 +149,7 @@ May fire `onSetup` again (e.g. wrong PIN) or `onConnect` on success.
 | `setParticipantText(uuid, text)` | Overlay text. |
 | `setPresentationInMix(state, uuid)` | Adaptive Composition: include presentation in the mix. |
 | `setRole(uuid, setting)` | `setting`: `"chair"` (host) / `"guest"`. |
-| `setParticipantLayoutGroup(uuid, layout_group)` | Assign to a layout group. |
+| `setParticipantLayoutGroup(uuid, layout_group)` | v41+. Assign to a layout group (pairs with `setPinningConfig` — see Pinning configuration below). |
 | `setSendToAudioMixes(mixes, uuid)` | Configure send mixes. `mixes`: `{ mixes: [{ mix_name, prominent }, ...], uuid }`. |
 | `setReceiveFromAudioMix(mix, uuid)` | Configure receive mix. |
 | `unlockParticipant(uuid)` | Admit from waiting room. |
@@ -176,13 +176,80 @@ May fire `onSetup` again (e.g. wrong PIN) or `onConnect` on success.
 | `setClassificationLevel(level)` | Theme classification level. |
 | `getClassificationLevel(cb)` | Available levels + current. |
 
-### Pinning configuration (Host, v41+)
+### Pinning configuration (Host)
 
-| Method | Purpose |
-|---|---|
-| `setPinningConfig(config_name, dynamic_pinning_config)` | Apply a pinning config. |
-| `getPinningConfig(cb)` | Current config. |
-| `getAvailablePinningConfigs(cb)` | All configs. |
+Participant pinning reserves layout slots for named **layout groups**. Two
+generations exist:
+
+- **Static configs (v38+)** — predefined pinning configs authored in the
+  conference theme. The client just names one to apply it.
+- **Dynamic configs (v41+)** — the client supplies the whole config object
+  inline at call time, no theme edit required. This is the "dynamic
+  participant pinning" feature.
+
+| Method | Version | Purpose |
+|---|---|---|
+| `setPinningConfig(config_name, dynamic_pinning_config)` | static v38 / dynamic v41 | Apply a config. Pass **either** `config_name` (a theme config) **or** `dynamic_pinning_config` (an inline object — see below). Pass `config_name` as `""` to clear. |
+| `getPinningConfig(cb)` | v38 | The currently-applied config. |
+| `getAvailablePinningConfigs(cb)` | v38 | Theme-defined configs available to name. |
+| `setParticipantLayoutGroup(uuid, layout_group)` | v41 | Assign a participant to one of the config's layout groups (see participant-control table above). This is what actually fills the reserved slots. |
+
+A pinning config is inert until participants are assigned to its layout
+groups — `setPinningConfig` defines the slots, `setParticipantLayoutGroup`
+puts people in them.
+
+**`dynamic_pinning_config` object shape** (v41):
+
+```js
+{
+  name: "exec_review",        // ≤50 chars, alphanumeric + underscore
+  slots: [
+    {
+      layout_groups: ["chair", "presenter"],  // ordered; first match wins.
+                                               // a "!<uuid>" entry pins one participant
+      show_reserved: true,                     // show a placeholder while the slot is empty (default true)
+      reserved_appearance: { /* … */ },        // optional slot styling
+    },
+    // … one entry per reserved slot
+  ],
+  backfill: false,            // fill un-pinned slots with other participants (default false)
+  remove_self: false,         // drop self-view from the pinned layout (default false)
+}
+```
+
+Constraint: a **dynamic** config's `reserved_appearance` **cannot reference
+files** (theme assets) — inline configs are file-free. Static theme configs
+can.
+
+Worked example — pin chairs and presenters into reserved slots:
+
+```js
+// 1. Define the layout (host only).
+rtc.setPinningConfig(null, {
+  name: "exec_review",
+  slots: [
+    { layout_groups: ["chair"] },
+    { layout_groups: ["presenter"] },
+  ],
+  backfill: true,
+});
+
+// 2. Assign participants to groups as they join / change role.
+rtc.setParticipantLayoutGroup(chairUuid, "chair");
+rtc.setParticipantLayoutGroup(presenterUuid, "presenter");
+
+// 3. Observe: each participant's current group arrives as `layout_group`
+//    on the participant object; the active config name arrives as
+//    `pinning_config` in onConferenceUpdate.
+```
+
+Under the hood these map to the Client REST API
+(`POST …/conferences/<alias>/set_pinning_config` with
+`{pinning_config}` or `{dynamic_pinning_config}`, and
+`POST …/participants/<uuid>/layout_group` with `{layout_group}`) — see the
+`pexip-client-api` skill if you're driving it without PexRTC. The modern
+`@pexip/infinity` packages do **not** wrap this yet (see
+`references/modern-package-map.md`).
 
 ### Personal video mixes (v38+)
 
@@ -313,7 +380,7 @@ Old layout names `"4:0"`, `"9:0"`, `"16:0"`, `"25:0"` are now
 | **v38** | Pinning, personal layouts, enhanced captions: `createVideoMix`, `getPinningConfig`, `getAvailablePinningConfigs`, `setGuestsCanPresent`, `setGuestsCanSeeGuests`, `onLiveCaptions.sources[]` |
 | **v39** | Timer, extended AC, media-processing indicator: `setClock`, `getClock`, `enable_extended_ac`, `external_media_processing_indicator`, `recording`/`transcribing`/`streaming`/`ai_enabled` in `onConferenceUpdate` |
 | **v40** | `chat_enabled` field in `onConferenceUpdate` |
-| **v41** | Custom properties, dynamic pinning: `custom_properties`, `host_custom_properties`, `private_custom_properties` in callbacks; `dynamic_pinning_config` parameter |
+| **v41** | Custom properties, dynamic pinning: `custom_properties`, `host_custom_properties`, `private_custom_properties` in callbacks; `dynamic_pinning_config` parameter on `setPinningConfig`; `setParticipantLayoutGroup` |
 
 When writing PexRTC code, prefer detecting capabilities (e.g.
 `typeof rtc.setClock === "function"`) over hard-checking version

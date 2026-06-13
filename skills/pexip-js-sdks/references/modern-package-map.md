@@ -69,6 +69,18 @@ const client  = createInfinityClient(signals);
 await client.call({ conferenceAlias, displayName, callType: ClientCallType.AudioVideo, mediaStream, node });
 ```
 
+**Not yet wrapped: participant pinning (v41).** As of `@pexip/infinity` /
+`@pexip/infinity-api` v23, the client exposes `setLayout`,
+`setPersonalLayout`, `transformLayout`, and `availableLayouts` — but **no**
+method for pinning configs or layout-group assignment. The v41 "dynamic
+participant pinning" feature (`set_pinning_config`,
+`participants/<uuid>/layout_group`) has a method surface only in legacy
+**PexRTC** (`setPinningConfig`, `setParticipantLayoutGroup` — see
+`references/pexrtc-api.md`). On the modern stack you must call those two
+Client REST endpoints yourself (raw `fetch`, or via `@pexip/infinity-api`'s
+generic request layer) — see the `pexip-client-api` skill. Re-check newer
+package versions before assuming this is still true.
+
 ### `@pexip/infinity-api` — generated HTTP types
 
 100+ functions matching `/api/client/v2/conferences/<alias>/...`. No peer
